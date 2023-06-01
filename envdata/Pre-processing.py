@@ -4,7 +4,7 @@ import torch.nn as nn
 import pandas as pd
 import torch.optim as optim
 
-
+#hello
 def pre_df(df):
     df = df.dropna()
     label = df['Àç½ÇÀÎ¿ø']
