@@ -21,7 +21,7 @@ def scale_255(array,i):
     min_value = np.min(first_elements)
     max_value = np.max(first_elements)
     # 스케일링 수행
-    scaled_array = (first_elements - min_value) *(1 / (max_value - min_value))
+    scaled_array = (first_elements - min_value) *(100 / (max_value - min_value))
     return scaled_array
 
 #Train Data
