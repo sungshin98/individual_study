@@ -16,35 +16,35 @@ torch.manual_seed(125)
 if torch.cuda.is_available():
     torch.cuda.manual_seed_all(125)
 
-def load_mnist():
-    import torchvision.transforms as transforms
 
-    mnist_transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0,5),(1.0,))
-    ])
+import torchvision.transforms as transforms
 
-    from torchvision.datasets import MNIST
-    download_root = '../080289-main/chap07/MNIST_DATASET'
+mnist_transform = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Normalize((0.5,), (1.0,))
+])
 
-    train_dataset = MNIST(download_root, transforms = mnist_transform,
-                          train=True, download=True)
-    valid_dataset = MNIST(download_root, transforms=mnist_transform,
-                          train=False, download=True)
-    test_dataset = MNIST(download_root, transforms=mnist_transform,
-                         train=False, download=True)
+from torchvision.datasets import MNIST
+download_root = '../080289-main/chap07/MNIST_DATASET'
 
-    batch_size = 64
-    train_loader = DataLoader(dataset=train_dataset,
-                              batch_size = batch_size,
-                              shuffle=True)
-    valid_loader = DataLoader(dataset=valid_dataset,
-                              batch_size=batch_size,
-                              shuffle=True)
-    test_loader = DataLoader(dataset=test_dataset,
-                             batch_size=batch_size,
-                             shuffle=True)
-load_mnist()
+train_dataset = MNIST(download_root, transform = mnist_transform,
+                      train=True, download=True)
+valid_dataset = MNIST(download_root, transform = mnist_transform,
+                      train=False, download=True)
+test_dataset = MNIST(download_root, transform = mnist_transform,
+                     train=False, download=True)
+
+batch_size = 16
+train_loader = DataLoader(dataset=train_dataset,
+                          batch_size = batch_size,
+                          shuffle=True)
+valid_loader = DataLoader(dataset=valid_dataset,
+                          batch_size=batch_size,
+                          shuffle=True)
+test_loader = DataLoader(dataset=test_dataset,
+                         batch_size=batch_size,
+                         shuffle=True)
+
 
 
 batch_size=100
@@ -75,23 +75,22 @@ class LSTMCell(nn.Module):
         gates = gates.squeeze()
         ingate, forgetgate, cellgate, outgate = gates.chunk(4, 1)
 
-        ingate = F.sigmoid(ingate) # 입력 게이트에 시그모이드 적용
-        forgetgate = F.sigmoid(forgetgate) # 망각 게이트에 시그모이드 적용
-        cellgate = F.tanh(cellgate) # 셀 게이트에 탄젠트 적용
-        outgate = F.sigmoid(outgate) # 출력 게이트에 시그모이드 적용
+        ingate = torch.sigmoid(ingate) # 입력 게이트에 시그모이드 적용
+        forgetgate = torch.sigmoid(forgetgate) # 망각 게이트에 시그모이드 적용
+        cellgate = torch.tanh(cellgate) # 셀 게이트에 탄젠트 적용
+        outgate = torch.sigmoid(outgate) # 출력 게이트에 시그모이드 적용
 
         cy = torch.mul(cx, forgetgate) + torch.mul(ingate, cellgate)
-        hy = torch.mul(outgate, F.tanh(cy))
+        hy = torch.mul(outgate, torch.tanh(cy))
 
         return(hy, cy)
 
 class LSTMModel(nn.Module):
-    def __int__(self, input_dim, hidden_dim, layer_dim, output_dim, bias=True):
+    def __init__(self, input_dim, hidden_dim, layer_dim, output_dim, bias=True):
         super(LSTMModel, self).__init__()
         self.hidden_dim = hidden_dim
-
         self.layer_dim = layer_dim
-        self.lstm = LSTMCell(input_dim, hidden_dim, layer_dim)
+        self.lstm = LSTMCell(input_dim, hidden_dim, bias)  # bias 인자 전달
         self.fc = nn.Linear(hidden_dim, output_dim)
 
     def forward(self, x):
@@ -103,4 +102,76 @@ class LSTMModel(nn.Module):
         if torch.cuda.is_available():
             c0 = Variable(torch.zeros(self.layer_dim, x.size(0), self.hidden_dim).cuda())
         else:
-            c0 = Vari
+            c0 = Variable(torch.zeros(self.layer_dim, x.size(0), self.hidden_dim))
+
+        outs = []
+        cn = c0[0,:,:]
+        hn = h0[0,:,:]
+
+        for seq in range(x.size(1)):
+            hn, cn = self.lstm(x[:,seq,:], (hn,cn))
+            outs.append(hn)
+
+        out = outs[-1].squeeze()
+        out = self.fc(out)
+        return out
+
+
+input_dim = 28
+hidden_dim = 128
+layer_dim = 1
+output_dim = 18
+
+model = LSTMModel(input_dim, hidden_dim, layer_dim, output_dim, bias=True)
+if torch.cuda.is_available():
+    model.cuda()
+
+
+criterion = nn.CrossEntropyLoss()
+learning_rate = 0.1
+optimizer = torch.optim.SGD(model.parameters(), lr = learning_rate)
+
+seq_dim = 28
+loss_list = []
+iter = 0
+for epoch in range(num_epochs):
+    for i, (images, labels) in enumerate(train_loader):
+        if torch.cuda.is_available():
+            images = Variable(images.view(-1, seq_dim, input_dim).cuda())
+            labels = Variable(labels)
+        else:
+            images = Variable(images.view(-1, seq_dim, input_dim))
+            labels = Variable(labels)
+
+        optimizer.zero_grad()
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+
+        if torch.cuda.is_available():
+            loss.cuda()
+        loss.backward()
+        optimizer.step()
+        loss_list.append(loss.item())
+        iter += 1
+
+        if iter % 500 == 0:
+            correct = 0
+            total = 0
+
+            for images, lebels in valid_loader:
+                if torch.cuda.is_available():
+                    images = Variable(images.view(-1, seq_dim, input_dim).cuda())
+                else:
+                    images = Variable(images.view(-1, seq_dim, input_dim))
+
+                outputs = model(images)
+                _, predicted = torch.max(outputs.data, 1)
+
+                total += labels.size(0)
+                if torch.cuda.is_available():
+                    correct += (predicted.cpu() == labels.cpu()).sum()
+                else:
+                    correct += (predicted == labels).sum()
+
+            accuracy = 100 * correct / total
+            print(f'Iteration : {iter} Loss : {loss.item()} Accuracy : {accuracy}')
