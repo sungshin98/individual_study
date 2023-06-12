@@ -6,6 +6,7 @@ import sys
 import openai
 import os
 
+sys.stdout.reconfigure(encoding='utf-8')
 openai.api_key = sys.argv[1]
 os.environ["OPENAI_API_KEY"] = sys.argv[1]
 '''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'''
