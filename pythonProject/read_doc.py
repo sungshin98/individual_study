@@ -15,5 +15,10 @@ documents = SimpleDirectoryReader(input_files=[sys.argv[2]]).load_data()
 index = GPTVectorStoreIndex.from_documents(documents)
 gpt_engine = index.as_query_engine(indsimilarity_top_k=-1)
 
-response = gpt_engine.query(sys.argv[3])
-print(response)
+while True:
+    query = input("Enter your question (or leave blank to exit): ")
+    if not query:
+        break
+
+    response = gpt_engine.query(query)
+    print(response)
