@@ -5,7 +5,6 @@ import torchvision.datasets as dataset
 from torch.autograd import Variable
 from torch.nn import Parameter
 from torch import Tensor
-import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import math
 
