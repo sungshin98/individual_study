@@ -1,5 +1,5 @@
 git ->
-bash read.sh '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' *.pdf
+bash read.sh 'sk-zo-----' *.pdf
 
 sh ->
 sh read.sh '[gpt-key]' [pdf name]
