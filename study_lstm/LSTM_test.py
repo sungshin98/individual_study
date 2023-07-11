@@ -174,3 +174,5 @@ for epoch in range(num_epochs):
 
             accuracy = 100 * correct / total
             print(f'Iteration : {iter} Loss : {loss.item()} Accuracy : {accuracy}')
+
+
